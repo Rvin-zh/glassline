@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Open-Cluely
+Comment=AI interview and meeting copilot
+Exec=env OPEN_CLUELY_DISPLAY_PROFILE=xwayland npm --prefix /home/arvinzaheri/Downloads/assistant start
+Icon=/home/arvinzaheri/Downloads/assistant/assets/open-cluely.png
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupWMClass=com.opencluely.assistant
+X-GNOME-UsesNotifications=false

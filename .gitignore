@@ -1,0 +1,60 @@
+# Secrets and local runtime
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Settings export can contain API keys
+**/settings-seed.json
+!**/*.example.json
+
+# Chromium profile from the Mac transfer (cookies, local storage)
+config/
+
+# Cursor chat export from another machine
+open-cluely-cursor-history/
+
+# Installers and archives
+*.zip
+*.dmg
+*.tar
+*.tar.gz
+*.tgz
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+out/
+release/
+*.asar
+*.asar.bak*
+
+# Generated repo dumps
+repomix-output.txt
+
+# Logs, caches, and local captures
+*.log
+logs/
+logs.txt
+npm-debug.log*
+.npm/
+.eslintcache
+cache/
+.stealth_screenshots/
+coverage/
+__pycache__/
+*.pyc
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+
+.claude/
