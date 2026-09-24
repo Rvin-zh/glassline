@@ -1,0 +1,26 @@
+Open-Cluely transfer (from Fedora)
+
+1. Copy this whole folder (or open-cluely-for-mac.tar) to the Mac.
+
+2. Pick the installer:
+   - Apple Silicon (M1/M2/M3/M4):  Open-Cluely-1.1.0-arm64-mac.zip
+   - Intel Mac:                    Open-Cluely-1.1.0-mac.zip
+
+3. Unzip it, then Right-click Open-Cluely.app → Open
+   (it is unsigned; macOS will warn once).
+
+   Optional, in Terminal:
+     xattr -dr com.apple.quarantine ~/Downloads/Open-Cluely.app
+
+4. Settings/API keys: the .env file is your runtime flags.
+   In-app keys live in the app Settings UI, not in .env.
+   Chromium profile copy (optional):
+     mkdir -p ~/Library/Application\ Support/open-cluely
+     cp -a config/. ~/Library/Application\ Support/open-cluely/
+
+5. To run from source instead of the .app:
+     tar -xzf source.tar.gz
+     npm ci
+     cp .env .   # already included
+     npm start
+   See MAC.md for microphone + screen-recording permissions.

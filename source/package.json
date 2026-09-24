@@ -1,0 +1,126 @@
+{
+  "name": "open-cluely",
+  "version": "1.1.0",
+  "description": "Open-source AI interview and meeting copilot with live transcription and screen context",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/run-electron.js",
+    "start:hidden": "node scripts/run-electron.js --start-hidden",
+    "start:wayland": "OPEN_CLUELY_DISPLAY_PROFILE=wayland node scripts/run-electron.js",
+    "start:xwayland": "OPEN_CLUELY_DISPLAY_PROFILE=xwayland node scripts/run-electron.js",
+    "dev": "node scripts/run-electron.js --enable-logging",
+    "test": "node --test --test-reporter=spec test/*.test.js test/**/*.test.js",
+    "test:e2e": "node scripts/e2e-electron.js",
+    "verify": "npm test && npm run test:e2e && npm run smoke:fedora -- --no-write && npm run smoke:macos -- --no-write",
+    "verify:live": "npm run verify && npm run benchmark:models && npm run smoke:stt",
+    "benchmark:models": "node scripts/benchmark-models.js",
+    "smoke:fedora": "node scripts/smoke-fedora.js",
+    "smoke:stt": "node scripts/smoke-stt.js",
+    "smoke:macos": "node scripts/smoke-macos.js",
+    "build": "node scripts/run-build.js",
+    "build:win": "node scripts/run-build.js --win portable",
+    "build:mac": "node scripts/run-build.js --mac",
+    "export:settings-seed": "node scripts/run-export-settings-seed.js",
+    "build:linux": "node scripts/run-build.js --linux",
+    "build:linux:rpm": "node scripts/run-build.js --linux rpm",
+    "build:linux:appimage": "node scripts/run-build.js --linux AppImage"
+  },
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "dotenv": "^17.4.2",
+    "mammoth": "^1.9.0",
+    "openai": "^5.12.2",
+    "pdf-parse": "^1.1.1",
+    "portkey-ai": "^3.1.0",
+    "screenshot-desktop": "^1.15.6",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.6"
+  },
+  "build": {
+    "appId": "com.opencluely.assistant",
+    "productName": "Open-Cluely",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*",
+      "!.git/**/*",
+      "!dist/**/*",
+      "!test/**/*",
+      "!docs/**/*",
+      "!repomix-output.txt"
+    ],
+    "asarUnpack": [
+      "node_modules/screenshot-desktop/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env"
+      },
+      {
+        "from": "packaging/macos/settings-seed.json",
+        "to": "settings-seed.json"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/open-cluely.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "identity": null,
+      "entitlements": "packaging/macos/entitlements.mac.plist",
+      "entitlementsInherit": "packaging/macos/entitlements.mac.inherit.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Open-Cluely needs the microphone for live interview transcription.",
+        "NSCameraUsageDescription": "Open-Cluely does not use the webcam. Chromium’s desktop-capture pipeline requires this string for Screenshot, Auto Screen, and host-audio loopback.",
+        "NSAudioCaptureUsageDescription": "Open-Cluely captures host (system) audio for transcription via the desktop-capturer loopback, which requires Screen Recording consent on macOS."
+      },
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/chrome.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "verifyUpdateCodeSignature": false,
+      "fileAssociations": []
+    },
+    "portable": {
+      "artifactName": "OpenCluely.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "rpm"
+      ],
+      "category": "Utility",
+      "icon": "assets/open-cluely.png",
+      "maintainer": "Open-Cluely contributors <open-cluely@users.noreply.github.com>",
+      "synopsis": "AI interview and meeting copilot",
+      "description": "Open-Cluely desktop copilot with live transcription, screenshots, and AI answers."
+    }
+  },
+  "author": "Open-Cluely contributors <open-cluely@users.noreply.github.com>",
+  "homepage": "https://github.com/shubhamshnd/Open-Cluely",
+  "license": "MIT"
+}
