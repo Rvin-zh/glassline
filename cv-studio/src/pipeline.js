@@ -40,7 +40,7 @@ async function runStudio({ text, jobText, model, outDir, writeFile, renderPdf })
   }
   if (hasJob) {
     try {
-      document = await humanize(document, bank, model);
+      document = await humanize(document, bank, model, jobText);
     } catch (error) {
       return exportResume(document, { outDir, writeFile, renderPdf });
     }
