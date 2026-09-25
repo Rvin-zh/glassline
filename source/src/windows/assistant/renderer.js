@@ -422,6 +422,22 @@ async function init() {
     setupEventListeners();
     setupIpcListeners();
     setupWindowAdjustments();
+    const externalLayerSelect = document.getElementById('external-layer-select');
+    if (externalLayerSelect) {
+        externalLayerSelect.addEventListener('change', async () => {
+            const layerId = externalLayerSelect.value;
+            if (!window.electronAPI?.chooseExternalLayer) {
+                return;
+            }
+            const result = await window.electronAPI.chooseExternalLayer(layerId);
+            if (result?.external) {
+                showFeedback('Folio opened as an external layer', 'info');
+            }
+            if (result && result.ok === false) {
+                showFeedback(result.error || 'Could not open that layer', 'error');
+            }
+        });
+    }
     if (chatAutoScrollToggle) {
         chatAutoScrollToggle.addEventListener('click', () => setAutoScrollEnabled(!autoScrollEnabledState));
         paintAutoScrollToggle();

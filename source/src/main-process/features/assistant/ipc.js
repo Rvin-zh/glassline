@@ -1,8 +1,14 @@
-﻿const {
+﻿const path = require('path');
+const { spawn } = require('child_process');
+const {
   isConfiguredOutputFormat,
   resolveOutputFormat,
   sanitizeCustomOutputTemplate
 } = require('../../../config');
+const {
+  chooseLayer,
+  folioScriptPath
+} = require('../../../platform/external-layers');
 const {
   isVertexProviderSlug
 } = require('../../../services/ai/portkey-service');
@@ -512,6 +518,24 @@ function registerAssistantIpc({
 
   ipcMain.handle('get-screenshots-count', () => {
     return screenshotManager.getScreenshotsCount();
+  });
+
+  ipcMain.handle('choose-external-layer', async (_event, payload = {}) => {
+    const choice = chooseLayer(payload.layerId);
+    if (!choice.ok || !choice.external) {
+      return choice;
+    }
+    const script = folioScriptPath({
+      resourcesPath: process.resourcesPath,
+      repoRoot: path.resolve(__dirname, '../../../../../')
+    });
+    const child = spawn(process.execPath, [script], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+    });
+    child.unref();
+    return { ...choice, script, pid: child.pid };
   });
 
   ipcMain.handle('get-window-bounds', () => {
