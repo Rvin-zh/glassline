@@ -1,0 +1,11 @@
+{
+  "name": "cv-studio",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "dependencies": {
+    "mammoth": "^1.9.0",
+    "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.16.0"
+  }
+}
