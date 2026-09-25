@@ -3,6 +3,7 @@ const { applyRules } = require("./rules");
 const { tailor } = require("./tailor");
 const { humanize } = require("./humanize");
 const { exportResume } = require("./export-resume");
+const { simulateAts } = require("./ats-simulate");
 
 function documentFromBank(bank) {
   return {
@@ -30,22 +31,34 @@ async function runStudio({ text, jobText, model, outDir, writeFile, renderPdf })
   }
   let document = applyRules(documentFromBank(bank), { jobText, factBank: bank });
   const hasJob = String(jobText || "").trim().length >= 40;
+  const before = hasJob ? simulateAts(document, jobText, bank) : null;
   if (hasJob) {
     try {
       const tailored = await tailor(document, jobText, bank, model);
       document = tailored.document;
     } catch (error) {
-      return exportResume(document, { outDir, writeFile, renderPdf });
+      const exported = await exportResume(document, { outDir, writeFile, renderPdf });
+      return { ...exported, ats: { before, after: before } };
     }
   }
   if (hasJob) {
     try {
       document = await humanize(document, bank, model, jobText);
     } catch (error) {
-      return exportResume(document, { outDir, writeFile, renderPdf });
+      const exported = await exportResume(document, { outDir, writeFile, renderPdf });
+      return { ...exported, ats: { before, after: simulateAts(document, jobText, bank) } };
     }
   }
-  return exportResume(document, { outDir, writeFile, renderPdf });
+  const exported = await exportResume(document, { outDir, writeFile, renderPdf });
+  if (!hasJob) return exported;
+  const after = simulateAts(document, jobText, bank, { failures: exported.failures || [] });
+  if (exported.ok) {
+    await writeFile(
+      `${outDir}/ats-report.json`,
+      JSON.stringify({ before, after }, null, 2)
+    );
+  }
+  return { ...exported, ats: { before, after } };
 }
 
 module.exports = { runStudio, documentFromBank };

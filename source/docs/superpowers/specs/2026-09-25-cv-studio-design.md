@@ -21,6 +21,7 @@ Glassline stays the live interview overlay. This studio does not search for jobs
 - The studio is its own program in `cv-studio/` at the repository root. It does not import Glassline, and Glassline does not import it.
 - Tailoring and humanization use one chat-model interface. The user supplies their own API key in `cv-studio/.env`, which stays gitignored. Unit tests inject a fake model and do not call the network.
 - A baseline export (wording, length, sections, buzzword removal) works with no job description. Keyword tailoring runs only after a job description is pasted.
+- A job or graduate-program description of at least 40 characters runs an ATS simulator before and after tailoring. The simulator scores only terms the fact bank can support, lists covered, missing, and refused terms, and shows the plain text a parser would keep. Refused terms are not added. The scores are written to `ats-report.json`.
 
 ## Success criteria
 
