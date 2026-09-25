@@ -60,3 +60,44 @@ test("keeps at most 15 skills and at most 5 bullets", () => {
   assert.ok(doc.experience[0].bullets.length <= 5);
   assert.ok(doc.experience[0].bullets.every((line) => line.split(/\s+/).length <= 25));
 });
+
+test("writes a short summary when the job matches facts", () => {
+  const job = "We need a Python engineer who writes SQL services for production systems every single day.";
+  const doc = applyRules({
+    name: "Ada Lovelace",
+    contact: { city: "London", email: "ada@example.com", phone: "", link: "" },
+    summary: "Results-driven engineer.",
+    skills: bank.skills,
+    experience: bank.roles.map((role) => ({ ...role })),
+    education: bank.education,
+    projects: bank.projects
+  }, { jobText: job, factBank: bank });
+  const lines = doc.summary.split("\n");
+  assert.ok(lines.length >= 2 && lines.length <= 3);
+  assert.match(doc.summary, /Engineer/);
+  assert.equal(doc.summary.toLowerCase().includes("results-driven"), false);
+});
+
+test("keeps a long career inside one page unless a second page is allowed", () => {
+  const roles = Array.from({ length: 12 }, (_, index) => ({
+    employer: `Co${index}`,
+    title: "Engineer",
+    start: `${2000 + index}-01`,
+    end: `${2001 + index}-01`,
+    current: false,
+    bullets: Array.from({ length: 5 }, (__, bullet) => `Shipped Python module ${index}-${bullet} for clients.`)
+  }));
+  const wide = createFactBank({ skills: ["Python"], roles, education: [], projects: [] });
+  const doc = applyRules({
+    name: "Ada",
+    contact: { city: "", email: "", phone: "", link: "" },
+    summary: null,
+    skills: ["Python"],
+    experience: roles,
+    education: [],
+    projects: []
+  }, { jobText: "", factBank: wide });
+  const lines = 10 + doc.experience.reduce((sum, role) => sum + 1 + role.bullets.length, 0);
+  assert.ok(lines <= 45);
+  assert.equal(doc.experience[0].start, "2011-01");
+});

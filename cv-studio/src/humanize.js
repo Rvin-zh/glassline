@@ -1,7 +1,7 @@
 const { claimSupported } = require("./fact-bank");
 const { applyRules } = require("./rules");
 
-async function humanize(document, factBank, model) {
+async function humanize(document, factBank, model, jobText = "") {
   const drafted = await model({
     prompt: [
       "Rephrase these bullets. Do not add employers, tools, dates, or numbers.",
@@ -16,7 +16,7 @@ async function humanize(document, factBank, model) {
     if (index !== 0 || safe.length === 0) return role;
     return { ...role, bullets: safe };
   });
-  return applyRules({ ...document, summary: null, experience }, { jobText: "", factBank });
+  return applyRules({ ...document, experience }, { jobText, factBank });
 }
 
 module.exports = { humanize };

@@ -32,7 +32,8 @@ async function main() {
         for (const line of body.split("\n")) doc.font("Times-Roman").fontSize(11).text(line);
         doc.end();
       });
-      return { text: body, pageCount: 1, bytes };
+      const pageCount = Math.max(1, Math.ceil(body.split("\n").filter((line) => line.length).length / 45));
+      return { text: body, pageCount, bytes };
     }
   });
   if (!result.ok) {
