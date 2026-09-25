@@ -1,5 +1,6 @@
 {
-  "name": "cv-studio",
+  "name": "folio",
+  "description": "Folio is Glassline's external resume layer. It builds an ATS-safe, tailored resume outside the interview overlay.",
   "private": true,
   "engines": { "node": ">=20" },
   "scripts": { "test": "node --test test/*.test.js" },

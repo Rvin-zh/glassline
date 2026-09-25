@@ -53,6 +53,13 @@ function createInvokeActions(ipcRenderer) {
       fallback: () => 0
     }),
 
+    chooseExternalLayer: invokeWithFallback(ipcRenderer, {
+      channel: 'choose-external-layer',
+      label: 'chooseExternalLayer',
+      transformArgs: (args) => [{ layerId: args[0] }],
+      fallback: (error) => ({ ok: false, error: error.message })
+    }),
+
     getWindowBounds: invokeWithFallback(ipcRenderer, {
       channel: 'get-window-bounds',
       label: 'getWindowBounds',

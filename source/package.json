@@ -71,6 +71,11 @@
       {
         "from": "packaging/macos/settings-seed.json",
         "to": "settings-seed.json"
+      },
+      {
+        "from": "../cv-studio",
+        "to": "folio",
+        "filter": ["**/*", "!test/**", "!.env"]
       }
     ],
     "mac": {
