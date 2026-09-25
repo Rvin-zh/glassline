@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createFactBank } = require("../src/fact-bank");
-const { simulateAts } = require("../src/ats-simulate");
+const { simulateAts, improveForJob } = require("../src/ats-simulate");
 
 const bank = createFactBank({
   skills: ["Python", "SQL"],
@@ -39,6 +39,15 @@ test("scores the job from skills the facts can support", () => {
   assert.ok(report.score > 0 && report.score < 100);
   assert.ok(report.parser.headings.includes("Experience"));
   assert.equal(report.parser.text.includes("Kubernetes"), false);
+});
+
+test("adds a job skill the facts already contain and raises the score", () => {
+  const job = "We need a Python engineer who also knows SQL for production data systems.";
+  const improved = improveForJob(document, job, bank);
+  assert.ok(improved.before.missing.includes("SQL"));
+  assert.ok(improved.document.skills.includes("SQL"));
+  assert.ok(improved.after.score > improved.before.score);
+  assert.equal(improved.document.skills.includes("Kubernetes"), false);
 });
 
 test("lowers the score when the ATS cannot parse the file", () => {

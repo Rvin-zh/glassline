@@ -15,7 +15,10 @@ function requirementTerms(jobText) {
 function keywordReport(document, jobText, factBank) {
   const blob = [
     ...(document.skills || []),
-    ...(document.experience || []).flatMap((role) => role.bullets || [])
+    ...(document.experience || []).flatMap((role) => [
+      role.title, role.employer, ...(role.bullets || [])
+    ]),
+    ...(document.education || []).flatMap((item) => [item.institution, item.credential])
   ].join(" ").toLowerCase();
   const covered = [];
   const missing = [];

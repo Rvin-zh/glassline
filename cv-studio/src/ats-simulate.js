@@ -30,4 +30,20 @@ function simulateAts(document, description, factBank, options = {}) {
   };
 }
 
-module.exports = { simulateAts };
+function improveForJob(document, description, factBank) {
+  const before = simulateAts(document, description, factBank);
+  const skills = [...(document.skills || [])];
+  for (const term of before.missing) {
+    if (skills.length >= 15) break;
+    if (skills.some((skill) => skill.toLowerCase() === term.toLowerCase())) continue;
+    skills.push(term);
+  }
+  const improved = { ...document, skills };
+  return {
+    document: improved,
+    before,
+    after: simulateAts(improved, description, factBank)
+  };
+}
+
+module.exports = { simulateAts, improveForJob };

@@ -3,7 +3,7 @@ const { applyRules } = require("./rules");
 const { tailor } = require("./tailor");
 const { humanize } = require("./humanize");
 const { exportResume } = require("./export-resume");
-const { simulateAts } = require("./ats-simulate");
+const { simulateAts, improveForJob } = require("./ats-simulate");
 
 function documentFromBank(bank) {
   return {
@@ -29,9 +29,13 @@ async function runStudio({ text, jobText, model, outDir, writeFile, renderPdf })
   if (!bank.roles.length) {
     return { ok: false, error: "unreadable", message: "Paste the resume text." };
   }
-  let document = applyRules(documentFromBank(bank), { jobText, factBank: bank });
+  let document = documentFromBank(bank);
   const hasJob = String(jobText || "").trim().length >= 40;
   const before = hasJob ? simulateAts(document, jobText, bank) : null;
+  if (hasJob) {
+    document = improveForJob(document, jobText, bank).document;
+  }
+  document = applyRules(document, { jobText, factBank: bank });
   if (hasJob) {
     try {
       const tailored = await tailor(document, jobText, bank, model);
