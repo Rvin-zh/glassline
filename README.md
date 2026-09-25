@@ -4,6 +4,8 @@ Glassline is a desktop overlay for live interviews and meetings. It transcribes 
 
 It runs on **macOS** and **Linux**.
 
+**Folio** is the external resume layer. Choose Folio in the overlay to open it beside Interview. Folio writes the ATS-safe resume. It does not run inside the overlay. The program is in [`cv-studio/`](cv-studio/).
+
 Use it only where recording, transcription, screenshots, and AI assistance are allowed.
 
 ## Origin
