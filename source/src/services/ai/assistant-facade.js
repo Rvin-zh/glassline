@@ -5,6 +5,8 @@ const {
   buildFollowUpEmailPrompt,
   buildInsightsPrompt,
   buildMeetingNotesPrompt,
+  buildPracticeEvaluationPrompt,
+  buildPracticeQuestionPrompt,
   buildScreenshotAnalysisPrompt,
   buildSuggestResponsePrompt
 } = require('./prompts');
@@ -304,6 +306,33 @@ function createAssistantFacade(adapter) {
     return generateText(prompt, streamOptions(options));
   }
 
+  async function generatePracticeQuestion(options = {}) {
+    const prompt = buildPracticeQuestionPrompt({
+      domain: options.domain,
+      difficulty: options.difficulty,
+      topic: options.topic,
+      programmingLanguage: options.programmingLanguage || adapter.programmingLanguage,
+      resumeContext: options.resumeContext,
+      jobDescriptionContext: options.jobDescriptionContext,
+      previousQuestions: options.previousQuestions
+    });
+    return generateText(prompt, streamOptions(options));
+  }
+
+  async function evaluatePracticeResponse(options = {}) {
+    const prompt = buildPracticeEvaluationPrompt({
+      question: options.question,
+      candidateAnswer: options.candidateAnswer,
+      domain: options.domain,
+      difficulty: options.difficulty,
+      programmingLanguage: options.programmingLanguage || adapter.programmingLanguage,
+      resumeContext: options.resumeContext,
+      jobDescriptionContext: options.jobDescriptionContext,
+      sessionHistory: options.sessionHistory
+    });
+    return generateText(prompt, streamOptions(options));
+  }
+
   return {
     adapter,
     get model() {
@@ -344,7 +373,9 @@ function createAssistantFacade(adapter) {
     generateMeetingNotes,
     generateFollowUpEmail,
     answerQuestion,
-    getConversationInsights
+    getConversationInsights,
+    generatePracticeQuestion,
+    evaluatePracticeResponse
   };
 }
 

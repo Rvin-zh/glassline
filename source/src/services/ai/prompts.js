@@ -4,6 +4,10 @@ const {
   resolveOutputFormat,
   sanitizeCustomOutputTemplate
 } = require('../../config');
+const {
+  buildPracticeEvaluationPrompt,
+  buildPracticeQuestionPrompt
+} = require('./interview-practice');
 
 const STATIC_PROMPT_VERSION = 'static-v3';
 
@@ -560,6 +564,8 @@ module.exports = {
   buildMeetingNotesPrompt,
   buildAskAiSessionPrompt,
   buildPinnedContextBlock,
+  buildPracticeEvaluationPrompt,
+  buildPracticeQuestionPrompt,
   buildScreenshotAnalysisPrompt,
   buildStaticSystemPrompt,
   buildSuggestResponsePrompt,

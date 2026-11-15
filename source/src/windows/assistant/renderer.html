@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Assistant</title>
+  <title>Glassline — Interview Practice &amp; Agent Studio</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -114,6 +114,37 @@
             Insights
           </button>
 
+          <select
+            id="practice-domain-select"
+            class="practice-domain-select"
+            aria-label="Practice interview domain"
+            title="Practice interview domain"
+          >
+            <option value="mixed">Practice: Mixed</option>
+            <option value="coding">Practice: Coding</option>
+            <option value="system-design">Practice: System Design</option>
+            <option value="behavioral">Practice: Behavioral</option>
+            <option value="conceptual">Practice: CS Concepts</option>
+          </select>
+
+          <button
+            id="practice-question-btn"
+            class="action-btn practice-question-btn"
+            type="button"
+            aria-label="Ask an interview practice question"
+          >
+            Ask Question
+          </button>
+
+          <button
+            id="practice-evaluate-btn"
+            class="action-btn practice-evaluate-btn"
+            type="button"
+            aria-label="Evaluate response and build improvement plan"
+          >
+            Coach &amp; Plan
+          </button>
+
           <button id="clear-btn" class="action-btn clear-btn">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -183,7 +214,7 @@
     <!-- Chat Interface -->
     <div id="chat-container" class="chat-container">
       <div class="chat-header">
-        <span class="chat-title">&#x1F916; AI Assistant</span>
+        <span class="chat-title">&#x1F393; Interview Practice &amp; Coaching Studio</span>
       </div>
       <div id="chat-messages" class="chat-messages">
         <!-- Messages will be added here dynamically -->
@@ -193,8 +224,8 @@
           id="chat-manual-input"
           class="chat-manual-input"
           rows="1"
-          placeholder="Ask the assistant..."
-          aria-label="Message the assistant"
+          placeholder="Type your practice answer or follow-up prompt..."
+          aria-label="Type your practice response or message"
         ></textarea>
         <button
           id="chat-autoscroll-toggle"

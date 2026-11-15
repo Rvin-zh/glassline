@@ -20,6 +20,8 @@ export function setupEventListeners({
     suggestBtn,
     notesBtn,
     insightsBtn,
+    practiceQuestionBtn,
+    practiceEvaluateBtn,
     themeToggleBtn,
     settingsBtn,
     closeSettingsBtn,
@@ -50,6 +52,8 @@ export function setupEventListeners({
     getResponseSuggestions,
     generateMeetingNotes,
     getConversationInsights,
+    generatePracticeQuestion,
+    evaluatePracticeResponse,
     toggleThemeMode,
     openSettings,
     closeSettings,
@@ -148,6 +152,8 @@ export function setupEventListeners({
     if (suggestBtn) suggestBtn.addEventListener('click', getResponseSuggestions);
     if (notesBtn) notesBtn.addEventListener('click', generateMeetingNotes);
     if (insightsBtn) insightsBtn.addEventListener('click', getConversationInsights);
+    if (practiceQuestionBtn) practiceQuestionBtn.addEventListener('click', generatePracticeQuestion);
+    if (practiceEvaluateBtn) practiceEvaluateBtn.addEventListener('click', evaluatePracticeResponse);
     if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleThemeMode);
 
     if (settingsBtn) settingsBtn.addEventListener('click', openSettings);

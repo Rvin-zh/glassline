@@ -1,7 +1,7 @@
 {
   "name": "open-cluely",
   "version": "1.1.0",
-  "description": "Glassline: Mac and Linux interview overlay, an indirect fork of Open-Cluely",
+  "description": "Glassline: AI Interview Practice Simulator, Coaching Studio & Multi-Agent MCP Bridge (Cursor, Claude Code, Antigravity, Codex)",
   "main": "src/main.js",
   "engines": {
     "node": ">=20"
@@ -12,6 +12,9 @@
     "start:wayland": "OPEN_CLUELY_DISPLAY_PROFILE=wayland node scripts/run-electron.js",
     "start:xwayland": "OPEN_CLUELY_DISPLAY_PROFILE=xwayland node scripts/run-electron.js",
     "dev": "node scripts/run-electron.js --enable-logging",
+    "mcp": "node scripts/run-mcp-server.js",
+    "agents:setup": "node scripts/setup-agent-integrations.js",
+    "agents:verify": "node scripts/setup-agent-integrations.js --verify",
     "test": "node --test --test-reporter=spec test/*.test.js test/**/*.test.js",
     "test:e2e": "node scripts/e2e-electron.js",
     "verify": "npm test && npm run test:e2e && npm run smoke:fedora -- --no-write && npm run smoke:macos -- --no-write",

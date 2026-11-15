@@ -709,6 +709,55 @@ body.window-dragging * {
   box-shadow: 0 4px 16px rgba(236, 72, 153, 0.3);
 }
 
+.practice-domain-select {
+  width: 112px;
+  min-width: 96px;
+  height: 27px;
+  padding: 3px 16px 3px 6px;
+  border: 1px solid var(--glass-control-border);
+  border-radius: 6px;
+  background: var(--glass-control-bg);
+  color: rgba(255, 255, 255, 0.92);
+  font: 600 9px/1.2 inherit;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.practice-domain-select option {
+  color: #111827;
+}
+
+.practice-domain-select:focus-visible {
+  outline: 2px solid rgba(16, 185, 129, 0.9);
+  outline-offset: 1px;
+}
+
+.action-btn.practice-question-btn {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: rgba(16, 185, 129, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.action-btn.practice-question-btn:hover {
+  background: rgba(16, 185, 129, 0.48);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn.practice-evaluate-btn {
+  background: rgba(20, 184, 166, 0.28);
+  border-color: rgba(20, 184, 166, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.action-btn.practice-evaluate-btn:hover {
+  background: rgba(20, 184, 166, 0.48);
+  box-shadow: 0 4px 16px rgba(20, 184, 166, 0.3);
+}
+
 .action-btn.theme-toggle-btn {
   background: rgba(99, 102, 241, 0.26);
   border-color: rgba(99, 102, 241, 0.45);

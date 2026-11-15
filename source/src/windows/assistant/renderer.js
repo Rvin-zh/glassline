@@ -204,6 +204,9 @@ const confirmCloseBtn = document.getElementById('confirm-close-btn');
 const suggestBtn = document.getElementById('suggest-btn');
 const notesBtn = document.getElementById('notes-btn');
 const insightsBtn = document.getElementById('insights-btn');
+const practiceDomainSelect = document.getElementById('practice-domain-select');
+const practiceQuestionBtn = document.getElementById('practice-question-btn');
+const practiceEvaluateBtn = document.getElementById('practice-evaluate-btn');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
 // Settings elements
@@ -275,12 +278,16 @@ let requestWebSearchEnabled = false;
 let autoScreenIntervalSeconds = 10;
 let autoScreenIntervalMs = 10_000;
 let activeAiActionId = null;
+let activePracticeQuestion = null;
+let lastPracticeAnswer = '';
 const aiActionInFlightState = {
     askAi: false,
     screenAi: false,
     suggest: false,
     notes: false,
-    insights: false
+    insights: false,
+    practiceQuestion: false,
+    practiceEvaluate: false
 };
 const autoScreenController = createAutoScreenController({
     captureScreenshot: (origin) => captureScreenshotForAnalysis(origin),
@@ -326,7 +333,7 @@ const chatUiManager = createChatUiManager({
     },
     showFeedback: (message, type) => showFeedback(message, type),
     addMonitorLog: (...args) => addMonitorLog(...args),
-    onManualMessageSubmitted: () => askAiWithSessionContext(),
+    onManualMessageSubmitted: ({ text } = {}) => handleManualChatSubmission(text),
     isAutoScrollEnabled
 });
 const settingsPanelManager = createSettingsPanelManager({
@@ -470,8 +477,8 @@ async function init() {
         app.style.display = 'flex';
     }
 
-    console.log('Renderer initialized - Ready for live transcription!');
-    showFeedback('Ready - click transcription to start', 'success');
+    console.log('Renderer initialized - Ready for Interview Practice & Coaching!');
+    showFeedback('Ready - click Ask Question to practice, or type a message', 'success');
     addMonitorLog('info', 'init', 'Renderer initialized');
     addMonitorLog('info', 'source-defaults', 'Default sources: Host on, Mic on');
 }
@@ -1101,6 +1108,11 @@ async function clearStealthData() {
         if (window.electronAPI.clearConversationHistory) {
             await window.electronAPI.clearConversationHistory();
         }
+        if (window.electronAPI.practiceResetSession) {
+            await window.electronAPI.practiceResetSession();
+        }
+        activePracticeQuestion = null;
+        lastPracticeAnswer = '';
         screenshotsCount = 0;
         messageStore.clear();
         chatMessagesArray = messageStore.getMessages();
@@ -1293,6 +1305,123 @@ async function getConversationInsights() {
     });
 }
 
+async function handleManualChatSubmission(text) {
+    if (activePracticeQuestion) {
+        lastPracticeAnswer = String(text || '').trim();
+        return evaluatePracticeResponse({ candidateAnswer: lastPracticeAnswer });
+    }
+    return askAiWithSessionContext();
+}
+
+async function generatePracticeQuestion() {
+    if (!window.electronAPI?.practiceNextQuestion) {
+        showFeedback('Practice mode API not available', 'error');
+        return;
+    }
+
+    const domain = practiceDomainSelect?.value || 'mixed';
+    await runAiActionWithLock('practiceQuestion', async () => {
+        const stream = createStreamHandler('practiceQuestion');
+        try {
+            showFeedback('Preparing practice question...', 'info');
+            setAnalyzing(true);
+            stream.start(`\u{1F393} **Interview Practice (${domain}):**\n\n`);
+
+            const result = await window.electronAPI.practiceNextQuestion({ domain });
+            if (result?.success && (result?.text || result?.question?.promptText)) {
+                const questionText = result.text || result.question.promptText;
+                const modeNote = result.offline ? ' *(Built-in Rubric Mode)*' : '';
+                activePracticeQuestion = questionText;
+                lastPracticeAnswer = '';
+                stream.finalize(`\u{1F393} **Interview Practice (${domain})${modeNote}:**\n\n${questionText}`);
+                updateUI();
+                chatManualInput?.focus();
+                showFeedback('Practice question ready — type your answer below', 'success');
+            } else {
+                throw new Error(result?.error || 'Failed to generate practice question');
+            }
+        } catch (error) {
+            console.error('Practice question error:', error);
+            showFeedback('Practice question failed', 'error');
+            addChatMessage('system', `Error: ${error.message}`);
+        } finally {
+            stream.cleanup();
+            setAnalyzing(false);
+        }
+    });
+}
+
+async function evaluatePracticeResponse(options = {}) {
+    if (!window.electronAPI?.practiceEvaluateResponse) {
+        showFeedback('Practice coaching API not available', 'error');
+        return;
+    }
+
+    if (!activePracticeQuestion) {
+        showFeedback('Click Ask Question first to start a practice turn', 'error');
+        return;
+    }
+
+    let candidateAnswer = typeof options?.candidateAnswer === 'string'
+        ? options.candidateAnswer.trim()
+        : '';
+
+    if (!candidateAnswer && chatManualInput) {
+        const composerText = String(chatManualInput.value || '').trim();
+        if (composerText) {
+            candidateAnswer = composerText;
+            addChatMessage('voice-mic', composerText);
+            chatManualInput.value = '';
+            chatUiManager.autoResizeManualInput();
+            chatUiManager.updateManualComposerState();
+        }
+    }
+
+    if (!candidateAnswer && lastPracticeAnswer) {
+        candidateAnswer = lastPracticeAnswer;
+    }
+
+    if (!candidateAnswer) {
+        showFeedback('Type your interview response first, then click Coach & Plan', 'error');
+        chatManualInput?.focus();
+        return;
+    }
+
+    lastPracticeAnswer = candidateAnswer;
+    const domain = practiceDomainSelect?.value || 'mixed';
+
+    await runAiActionWithLock('practiceEvaluate', async () => {
+        const stream = createStreamHandler('practiceEvaluate');
+        try {
+            showFeedback('Evaluating answer & building improvement plan...', 'info');
+            setAnalyzing(true);
+            stream.start('\u{1F4CB} **Coaching Feedback & Improvement Plan:**\n\n');
+
+            const result = await window.electronAPI.practiceEvaluateResponse({
+                question: activePracticeQuestion,
+                candidateAnswer,
+                domain
+            });
+
+            if (result?.success && (result?.evaluation || result?.text)) {
+                const feedbackText = result.evaluation || result.text;
+                const modeNote = result.offline ? ' *(Built-in Rubric Mode)*' : '';
+                stream.finalize(`\u{1F4CB} **Coaching Feedback & Improvement Plan${modeNote}:**\n\n${feedbackText}`);
+                showFeedback('Coaching feedback & improvement plan ready', 'success');
+            } else {
+                throw new Error(result?.error || 'Failed to evaluate practice answer');
+            }
+        } catch (error) {
+            console.error('Practice evaluation error:', error);
+            showFeedback('Practice evaluation failed', 'error');
+            addChatMessage('system', `Error: ${error.message}`);
+        } finally {
+            stream.cleanup();
+            setAnalyzing(false);
+        }
+    });
+}
+
 // SETTINGS FUNCTIONS
 
 async function openSettings() {
@@ -1337,6 +1466,8 @@ function updateUI() {
     const suggestInFlight = isAiActionInFlight('suggest');
     const notesInFlight = isAiActionInFlight('notes');
     const insightsInFlight = isAiActionInFlight('insights');
+    const practiceQuestionInFlight = isAiActionInFlight('practiceQuestion');
+    const practiceEvaluateInFlight = isAiActionInFlight('practiceEvaluate');
 
     if (screenshotBtn) {
         screenshotBtn.disabled = anyAiActionInFlight;
@@ -1372,6 +1503,20 @@ function updateUI() {
     if (insightsBtn) {
         insightsBtn.disabled = isAnalyzing || anyAiActionInFlight || insightsInFlight || !hasAiContext;
         insightsBtn.title = canRunAiActions ? 'Generate conversation insights' : 'Configure an AI provider in Settings';
+    }
+
+    if (practiceQuestionBtn) {
+        practiceQuestionBtn.disabled = isAnalyzing || anyAiActionInFlight || practiceQuestionInFlight;
+        practiceQuestionBtn.title = canRunAiActions
+            ? 'Ask a tailored text-based practice interview question'
+            : 'Ask a text-based practice question (built-in rubric mode)';
+    }
+
+    if (practiceEvaluateBtn) {
+        practiceEvaluateBtn.disabled = isAnalyzing || anyAiActionInFlight || practiceEvaluateInFlight || !activePracticeQuestion;
+        practiceEvaluateBtn.title = activePracticeQuestion
+            ? 'Evaluate your written answer, see how to respond instead, and build an improvement plan'
+            : 'Click Ask Question first to start a practice turn';
     }
 
     if (transcriptionToggle) {
@@ -1564,6 +1709,8 @@ function setupEventListeners() {
         suggestBtn,
         notesBtn,
         insightsBtn,
+        practiceQuestionBtn,
+        practiceEvaluateBtn,
         themeToggleBtn,
         settingsBtn,
         closeSettingsBtn,
@@ -1594,6 +1741,8 @@ function setupEventListeners() {
         getResponseSuggestions,
         generateMeetingNotes,
         getConversationInsights,
+        generatePracticeQuestion,
+        evaluatePracticeResponse,
         toggleThemeMode,
         openSettings,
         closeSettings,

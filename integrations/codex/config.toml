@@ -1,0 +1,7 @@
+# Glassline MCP server configuration for OpenAI Codex CLI (~/.codex/config.toml or workspace .codex/config.toml)
+[mcp_servers.glassline]
+command = "node"
+args = ["source/scripts/run-mcp-server.js"]
+
+[mcp_servers.glassline.env]
+GLASSLINE_AGENT_PORT = "7823"

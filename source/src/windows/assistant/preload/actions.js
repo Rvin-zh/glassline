@@ -310,6 +310,32 @@ function createInvokeActions(ipcRenderer) {
       channel: 'mobile-server-get-status',
       label: 'getMobileServerStatus',
       fallback: () => ({ listening: false, port: 7823, urls: [], clientCount: 0, error: null })
+    }),
+
+    practiceNextQuestion: invokeWithFallback(ipcRenderer, {
+      channel: 'practice-next-question',
+      label: 'practiceNextQuestion',
+      transformArgs: (args) => [args[0] && typeof args[0] === 'object' ? args[0] : {}],
+      fallback: (error) => ({ success: false, error: error.message })
+    }),
+
+    practiceEvaluateResponse: invokeWithFallback(ipcRenderer, {
+      channel: 'practice-evaluate-response',
+      label: 'practiceEvaluateResponse',
+      transformArgs: (args) => [args[0] && typeof args[0] === 'object' ? args[0] : {}],
+      fallback: (error) => ({ success: false, error: error.message })
+    }),
+
+    practiceGetState: invokeWithFallback(ipcRenderer, {
+      channel: 'practice-get-state',
+      label: 'practiceGetState',
+      fallback: (error) => ({ success: false, error: error.message })
+    }),
+
+    practiceResetSession: invokeWithFallback(ipcRenderer, {
+      channel: 'practice-reset-session',
+      label: 'practiceResetSession',
+      fallback: (error) => ({ success: false, error: error.message })
     })
   };
 }

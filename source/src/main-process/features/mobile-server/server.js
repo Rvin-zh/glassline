@@ -5,6 +5,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const { createInterviewPracticeService } = require('../../../services/ai/interview-practice');
 
 // Names that almost always belong to virtual adapters (Docker, WSL, VPN,
 // hypervisors). Phones cannot route to these IPs, so we want the real
@@ -47,17 +48,74 @@ function getLanAddresses() {
 
 const MOBILE_PORT = 7823;
 const MOBILE_HTML_PATH = path.join(__dirname, 'mobile.html');
+const MAX_AGENT_BODY_BYTES = 1024 * 1024;
+
+function isLoopbackRemoteAddress(remoteAddress = '') {
+  const normalized = String(remoteAddress || '').trim().toLowerCase();
+  return (
+    normalized === '127.0.0.1' ||
+    normalized === '::1' ||
+    normalized === '::ffff:127.0.0.1' ||
+    normalized === 'localhost'
+  );
+}
+
+function sendJson(res, statusCode, payload) {
+  const body = JSON.stringify(payload);
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
+  res.end(body);
+}
+
+function readJsonBody(req, maxBytes = MAX_AGENT_BODY_BYTES) {
+  return new Promise((resolve, reject) => {
+    let totalBytes = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
+        const err = new Error('Request body too large');
+        err.statusCode = 413;
+        reject(err);
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8').trim();
+      if (!raw) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(raw));
+      } catch (_error) {
+        const err = new Error('Invalid JSON request body');
+        err.statusCode = 400;
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
 
 function createMobileServer({
   getGeminiRuntime,
   getScreenshotManager,
   notifyDesktop,
+  getContextServices = () => null,
+  getAppState = () => null,
+  practiceService: providedPracticeService = null,
+  port = MOBILE_PORT,
   disabled = process.env.OPEN_CLUELY_DISABLE_MOBILE === '1'
 }) {
   const clients = new Set();
   const status = {
     listening: false,
-    port: MOBILE_PORT,
+    port,
     urls: [],
     clientCount: 0,
     error: null
@@ -65,6 +123,26 @@ function createMobileServer({
   if (disabled) {
     status.reason = 'disabled-for-e2e';
   }
+
+  const practiceService = providedPracticeService || createInterviewPracticeService({
+    getAdapter: () => {
+      const runtime = typeof getGeminiRuntime === 'function' ? getGeminiRuntime() : null;
+      return runtime?.isAiReady?.() ? runtime.getService() : null;
+    },
+    getContextTexts: () => {
+      const services = typeof getContextServices === 'function' ? getContextServices() : null;
+      const pinned = services?.documentService?.getPinnedDocumentTexts?.();
+      if (pinned) {
+        return pinned;
+      }
+      const state = typeof getAppState === 'function' ? (getAppState() || {}) : {};
+      return {
+        resume: state.resumeText || '',
+        jobDescription: state.jobDescriptionText || ''
+      };
+    },
+    getProgrammingLanguage: () => getGeminiRuntime?.()?.getActiveProgrammingLanguage?.() || 'Python'
+  });
 
   function emitStatus() {
     if (typeof notifyDesktop === 'function') {
@@ -77,7 +155,7 @@ function createMobileServer({
       name,
       address,
       virtual: !!virtual,
-      url: `http://${address}:${MOBILE_PORT}`
+      url: `http://${address}:${status.port}`
     }));
   }
 
@@ -115,10 +193,91 @@ function createMobileServer({
     } catch (_) { /* ignore */ }
   }
 
-  // ── HTTP server (serves mobile UI) ────────────────────────────────────────
+  async function handleAgentRequest(req, res, url) {
+    if (!isLoopbackRemoteAddress(req.socket?.remoteAddress)) {
+      sendJson(res, 403, {
+        ok: false,
+        error: 'Agent companion endpoints only accept localhost connections'
+      });
+      return;
+    }
+
+    const runtime = typeof getGeminiRuntime === 'function' ? getGeminiRuntime() : null;
+    const services = typeof getContextServices === 'function' ? getContextServices() : null;
+    const appState = typeof getAppState === 'function' ? (getAppState() || {}) : {};
+
+    if (req.method === 'GET' && url === '/api/agent/status') {
+      const service = runtime?.getService?.() || null;
+      sendJson(res, 200, {
+        ok: true,
+        service: 'glassline',
+        port: status.port,
+        aiReady: Boolean(runtime?.isAiReady?.()),
+        provider: runtime?.getActiveAiProvider?.() || appState.aiProvider || 'gemini',
+        model: service?.model || service?.modelName || appState.geminiModel || null,
+        practiceState: practiceService.getState()
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && url === '/api/agent/context') {
+      const pinned = services?.documentService?.getPinnedDocumentTexts?.() || {};
+      const durableNotes = services?.memoryService?.getDurableNotes?.()
+        || (Array.isArray(appState.durableNotes) ? appState.durableNotes : []);
+      const interviewSessions = Array.isArray(appState.interviewSessions)
+        ? appState.interviewSessions.map(({ id, archivedAt, title, summary }) => ({
+          id,
+          archivedAt,
+          title,
+          summary
+        }))
+        : [];
+      sendJson(res, 200, {
+        ok: true,
+        resume: String(pinned.resume || appState.resumeText || ''),
+        jobDescription: String(pinned.jobDescription || appState.jobDescriptionText || ''),
+        durableNotes,
+        interviewSessions,
+        practiceState: practiceService.getState()
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && url === '/api/agent/practice/question') {
+      const body = await readJsonBody(req);
+      const result = await practiceService.generateQuestion({
+        ...(body && typeof body === 'object' ? body : {}),
+        allowOfflineFallback: body?.allowOfflineFallback !== false
+      });
+      sendJson(res, result.success ? 200 : 400, { ok: result.success, ...result });
+      return;
+    }
+
+    if (req.method === 'POST' && url === '/api/agent/practice/evaluate') {
+      const body = await readJsonBody(req);
+      const result = await practiceService.evaluateResponse({
+        ...(body && typeof body === 'object' ? body : {}),
+        allowOfflineFallback: body?.allowOfflineFallback !== false
+      });
+      sendJson(res, result.success ? 200 : 400, { ok: result.success, ...result });
+      return;
+    }
+
+    sendJson(res, 404, { ok: false, error: 'Unknown agent endpoint' });
+  }
+
+  // ── HTTP server (serves mobile UI + localhost agent bridge) ────────────────
 
   const httpServer = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
+
+    if (url.startsWith('/api/agent/')) {
+      handleAgentRequest(req, res, url).catch((error) => {
+        const statusCode = error?.statusCode || 500;
+        sendJson(res, statusCode, { ok: false, error: error.message || 'Agent request failed' });
+      });
+      return;
+    }
 
     if (url === '/' || url === '/index.html') {
       try {
@@ -281,13 +440,20 @@ function createMobileServer({
 
   // ── Start listening ────────────────────────────────────────────────────────
 
-  httpServer.listen(MOBILE_PORT, '0.0.0.0', () => {
+  httpServer.listen(port, '0.0.0.0', () => {
+    const actualPort = typeof httpServer.address === 'function'
+      ? httpServer.address()?.port
+      : null;
+    if (typeof actualPort === 'number' && actualPort > 0) {
+      status.port = actualPort;
+    }
     refreshUrls();
     status.listening = true;
     status.error = null;
     emitStatus();
-    console.log(`[MobileServer] Listening on 0.0.0.0:${MOBILE_PORT}`);
-    console.log(`[MobileServer] Local:   http://localhost:${MOBILE_PORT}`);
+    console.log(`[MobileServer] Listening on 0.0.0.0:${status.port}`);
+    console.log(`[MobileServer] Local:   http://localhost:${status.port}`);
+    console.log(`[MobileServer] Agent:   http://127.0.0.1:${status.port}/api/agent/status`);
     for (const { name, url, virtual } of status.urls) {
       const tag = virtual ? '  [virtual — phone probably cannot reach]' : '';
       console.log(`[MobileServer] Network: ${url}  (${name})${tag}`);
@@ -301,7 +467,7 @@ function createMobileServer({
     status.error = err.message;
     emitStatus();
     if (err.code === 'EADDRINUSE') {
-      console.error(`[MobileServer] Port ${MOBILE_PORT} already in use — mobile companion disabled`);
+      console.error(`[MobileServer] Port ${status.port} already in use — mobile companion disabled`);
     } else {
       console.error('[MobileServer] HTTP server error:', err.message);
     }
@@ -310,6 +476,7 @@ function createMobileServer({
   return {
     broadcast,
     getStatus: () => ({ ...status }),
+    getPort: () => status.port,
     emitStatus,
     close() {
       try {

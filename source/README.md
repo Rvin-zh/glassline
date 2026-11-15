@@ -1,106 +1,75 @@
-# Glassline application
+# Glassline Source Runbook (`source/`)
 
-This directory is the application. It is the full [Open-Cluely](https://github.com/shubhamshnd/Open-Cluely) tree — main process, overlay, speech-to-text, AI providers, tests, and packaging — with Glassline’s Mac and Linux changes applied on top.
+This directory contains the Electron application, provider-neutral AI services, stdio MCP server, companion HTTP bridge, agent integration generator, and Node automated test suite.
 
-Glassline is an indirect fork. It was not created with GitHub’s Fork button. The parent repository explains the split: [../README.md](../README.md).
-
-The overlay transcribes host audio and the microphone, captures the screen, and answers in an always-on-top window. Use it only where recording, transcription, screenshots, and AI assistance are allowed.
+---
 
 ## Requirements
 
-- Node.js 20 or newer, npm 10 or newer
-- A Gemini or Portkey key, entered in Settings after launch
-- An AssemblyAI, OpenAI, or Portkey speech key if you use cloud transcription
+- **Node.js >= 20** (tested on macOS with Node 26 and npm 11)
+- **AI Providers (Optional — Offline Built-in Rubric Mode works without API keys):**
+  - **Gemini API** (`GEMINI_API_KEY`)
+  - **Portkey AI Gateway** (`PORTKEY_API_KEY` + provider slug / Vertex caching support)
+  - **Local CLI Agents** via `CliAgentService` (`claude`, `codex`, `agy`, `cursor`)
+- **Speech-to-Text (Optional for voice sessions):** AssemblyAI (`ASSEMBLYAI_API_KEY`) or OpenAI Realtime STT (`OPENAI_API_KEY`)
 
-## Run
+---
 
-macOS:
+## NPM Scripts
 
-```bash
-npm ci
-cp .env.example .env
-npm start
-```
+Run all commands from `source/`:
 
-Permission prompts, Screen Recording, and `npm run build:mac` are in [MAC.md](./MAC.md).
+| Script | Command | Purpose |
+| :--- | :--- | :--- |
+| `npm start` | `node scripts/run-electron.js` | Launch the Glassline Electron Interview Practice & Coaching Studio. |
+| `npm run dev` | `node scripts/run-electron.js --enable-logging` | Launch with verbose Electron main/renderer logs. |
+| `npm run mcp` | `node scripts/run-mcp-server.js` | Start the JSON-RPC 2.0 MCP stdio server (`glassline-mcp`). |
+| `npm run agents:setup` | `node scripts/setup-agent-integrations.js` | Regenerate MCP configs & guides for Cursor, Claude Code, Antigravity, and Codex (pass `-- --absolute` for absolute script paths). |
+| `npm run agents:verify` | `node scripts/setup-agent-integrations.js --verify` | Validate all 9 integration artifacts and run a live stdio MCP smoke handshake (`initialize`, `tools/list`, `tools/call`). |
+| `npm test` | `node --test --test-reporter=spec test/*.test.js test/**/*.test.js` | Run all unit and integration tests under `test/`. |
+| `npm run test:e2e` | `node scripts/e2e-electron.js` | Run headless Electron E2E smoke suite in isolated state directory. |
+| `npm run verify` | `npm test && npm run test:e2e && ...` | Combined test, Electron E2E, Fedora no-write smoke, and macOS packaging checks. |
+| `npm run build` | `node scripts/run-build.js` | Build distributable desktop packages with `electron-builder`. |
 
-Linux (Fedora 40+ is the tested desktop):
+---
 
-```bash
-npm ci
-cp .env.example .env
-npm start
-```
+## Environment Variables
 
-Packages, the XWayland default, and PipeWire host audio are in [FEDORA.md](./FEDORA.md). On a Wayland session the launcher uses XWayland so the window can be placed and kept on top. `npm run start:wayland` switches to native Wayland.
+| Variable | Purpose |
+| :--- | :--- |
+| `OPEN_CLUELY_STATE_DIR` | Override base directory where `cache/app-state.json` is stored (ideal for isolated test runs and academic sandboxes). |
+| `OPEN_CLUELY_ENV_PATH` | Explicitly override `.env` resolution path. |
+| `OPEN_CLUELY_DISABLE_MOBILE` | Set to `1` to disable binding the port `7823` HTTP + WebSocket companion server (used by isolated E2E runs). |
+| `GLASSLINE_AGENT_PORT` | Override companion HTTP bridge port queried by MCP tools (default: `7823`). |
+| `GLASSLINE_MCP_DISABLE_BRIDGE_PROBE` | Set to `1` to force MCP tools to operate directly on local state without probing `127.0.0.1:7823`. |
+| `GLASSLINE_AI_PROVIDER` | Select default headless provider (`gemini` or `portkey`) when invoking `glassline-mcp-server.js` outside Electron. |
 
-Useful variants:
+---
 
-```bash
-npm run dev            # Electron logging
-npm run start:hidden   # start without showing the window
-```
+## Module Architecture Map
 
-## What the overlay does
+### Core Services (`src/services/ai/`)
+- **`interview-practice.js`**: Text-based mock interview orchestrator (`PRACTICE_DOMAINS`, `PRACTICE_DIFFICULTIES`, `buildPracticeQuestionPrompt`, `buildPracticeEvaluationPrompt`, `scoreOfflineAnswer`, `createInterviewPracticeService`).
+- **`cli-agent-service.js`**: Implements the `contracts.js` AI adapter interface (`CliAgentService`) for `claude`, `codex`, `agy`, and `cursor` CLIs, plus `detectInstalledCliAgents()`.
+- **`assistant-facade.js`**: Provider-neutral wrapper adding `executionContext`, explicit Vertex/Gemini context-cache handling, and unified helpers (`generatePracticeQuestion`, `evaluatePracticeResponse`, `askAiWithSessionContext`, etc.).
+- **`prompts.js`**: Central static cacheable system prefix (`STATIC_PROMPT_VERSION`) and prompt construction templates.
+- **`contracts.js`**: Duck-typed adapter validator (`assertAiAdapter`) enforced across `GeminiService`, `PortkeyService`, and `CliAgentService`.
 
-- Live transcription from system audio and the microphone, with a per-source monitor.
-- Answers from Gemini or Portkey. Gemini keys can be a comma-separated list; the app fails over on quota or auth errors.
-- Screenshot and Auto Screen. Auto Screen repeats capture and analysis on a 5, 10, 15, or 30 second interval and keeps only the newest automatic capture.
-- Separate actions for a full-context answer (Ask AI), the current screen (Screen AI), short cues (Suggest), and a structured record (Notes).
-- Per-message AI / Off toggles, so a line can stay on screen without being sent on the next prompt.
-- Output length: Quick, Adaptive, Detailed, or a local Custom template.
-- Optional web search (Gemini grounding or Tavily), CV and job documents, and a short archive of previous interview notes.
-- A mobile page on port 7823 for a phone on the same network. It can trigger a screenshot and Ask AI. Treat that port as trusted-network only: the server listens on all interfaces.
+### Main Process & Companion Bridges (`src/main-process/` & `src/mcp/`)
+- **`start-application.js`**: Electron composition root creating a shared `practiceService` instance passed to both `registerAssistantIpc` and `createMobileServer`.
+- **`features/assistant/ipc.js`**: Registers practice IPC channels (`practice-next-question`, `practice-evaluate-response`, `practice-get-state`, `practice-reset-session`) alongside context/memory/AI handlers.
+- **`features/mobile-server/server.js`**: Serves the mobile companion UI on port `7823` and exposes localhost-restricted JSON endpoints under `/api/agent/*`.
+- **`src/mcp/glassline-mcp-server.js`**: Standalone JSON-RPC 2.0 MCP server with dual stdio framing (`Content-Length` and NDJSON).
 
-Each launch starts a new interview. Older summaries stay in Settings and are off until you select them.
+### Renderer (`src/windows/assistant/`)
+- **`renderer.html` & `styles.css`**: Practice domain selector (`#practice-domain-select`), `Ask Question` (`#practice-question-btn`), and `Coach & Plan` (`#practice-evaluate-btn`).
+- **`preload/actions.js`**: Safe IPC wrappers (`practiceNextQuestion`, `practiceEvaluateResponse`, `practiceGetState`, `practiceResetSession`).
+- **`renderer.js` & `renderer/features/listeners/event-listeners.js`**: Interactive practice state (`activePracticeQuestion`) that routes chat submissions straight into evaluation & coaching while a practice turn is active.
 
-## Configuration
+---
 
-| Variable | Default | Role |
-| --- | --- | --- |
-| `HIDE_FROM_SCREEN_CAPTURE` | `true` | Asks the OS to leave the overlay out of screen capture. Works on macOS. Linux cannot do this. |
-| `START_HIDDEN` | `false` | Launch without showing the window. |
-| `MAX_SCREENSHOTS` | `50` | Drops the oldest captures past this count. |
-| `SCREENSHOT_DELAY` | `300` | Milliseconds the window is hidden before a capture. |
-| `NODE_ENV` | `production` | `development` opens DevTools. |
-| `NODE_OPTIONS` | `--max-old-space-size=4096` | Node heap for the Electron process. |
+## Platform Guides
 
-Model lists, speech models, programming-language options, and shortcuts live in [`src/config.js`](./src/config.js). The first entry in each list is the default.
-
-Development state is `cache/app-state.json`. Development screenshots are `.stealth_screenshots/`. Packaged builds use Electron’s user-data directory. API keys are stored with Electron `safeStorage` when the OS keyring is available.
-
-When you add an environment variable, update [`src/bootstrap/environment.js`](./src/bootstrap/environment.js), [`.env.example`](./.env.example), and this file together.
-
-## Layout
-
-```text
-src/bootstrap/                         Environment loading
-src/main-process/                      Startup, window, shortcuts, IPC
-src/main-process/features/mobile-server/   Phone companion
-src/services/                          AI, speech-to-text, documents, saved state
-src/windows/assistant/                 Overlay window, preload bridge, renderer
-src/windows/legacy/                    Old experiments, not on the launch path
-assets/                                Icons
-packaging/macos/                       Entitlements and the settings-seed template
-test/                                  Node tests
-```
-
-File-level ownership is in [`notes.md`](./notes.md).
-
-## Scripts
-
-| Command | What it does |
-| --- | --- |
-| `npm test` | Fast Node tests. |
-| `npm run test:e2e` | Electron scenarios against a local fake provider. No real API keys. |
-| `npm run verify` | Tests, Electron scenarios, and the Fedora and macOS smoke checks. |
-| `npm run build:mac` | macOS dmg and zip. See [MAC.md](./MAC.md). |
-| `npm run build:linux` | Linux AppImage and rpm. See [FEDORA.md](./FEDORA.md). |
-
-`npm run verify:live` also calls live model and speech providers and can spend API credit. It does not print keys or transcript text.
-
-## Boundaries
-
-- Renderer code talks to the main process through `src/windows/assistant/preload/`. It does not import main-process modules.
-- New UI goes under `src/windows/assistant/renderer/features/`. New domain logic goes under `src/services/` or `src/main-process/features/`.
-- Do not commit `.env` or `packaging/macos/settings-seed.json`. Commit `.env.example` and `settings-seed.example.json` when the contract changes.
+- macOS setup & permissions: [`MAC.md`](MAC.md)
+- Linux / Fedora Wayland & PipeWire setup: [`FEDORA.md`](FEDORA.md)
+- Architecture, practice guide, and MCP reference: [`../docs/`](../docs/)

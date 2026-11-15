@@ -6,6 +6,9 @@
 const {
   isVertexProviderSlug
 } = require('../../../services/ai/portkey-service');
+const {
+  createInterviewPracticeService
+} = require('../../../services/ai/interview-practice');
 
 const AI_CONTEXT_CHANGED_ERROR_CODE = 'AI_CONTEXT_CHANGED';
 const AI_CONTEXT_CHANGED_MESSAGE =
@@ -20,13 +23,32 @@ function registerAssistantIpc({
   sendToRenderer,
   quitApplication,
   getContextServices,
-  getAppState
+  getAppState,
+  practiceService: providedPracticeService = null
 }) {
   let chatContext = [];
 
   function getContextServicesOrNull() {
     return typeof getContextServices === 'function' ? getContextServices() : null;
   }
+
+  const practiceService = providedPracticeService || createInterviewPracticeService({
+    getAdapter: () => (geminiRuntime?.isAiReady?.() ? geminiRuntime.getService() : null),
+    executeWithAdapter: (fn) => geminiRuntime.executeWithKeyFailover(fn),
+    getContextTexts: () => {
+      const services = getContextServicesOrNull();
+      const pinned = services?.documentService?.getPinnedDocumentTexts?.();
+      if (pinned) {
+        return pinned;
+      }
+      const state = typeof getAppState === 'function' ? getAppState() || {} : {};
+      return {
+        resume: state.resumeText || '',
+        jobDescription: state.jobDescriptionText || ''
+      };
+    },
+    getProgrammingLanguage: () => geminiRuntime?.getActiveProgrammingLanguage?.() || 'Python'
+  });
 
   function getTrustedOutputPromptOptions(payload = {}) {
     const appState = typeof getAppState === 'function' ? getAppState() || {} : {};
@@ -954,6 +976,63 @@ function registerAssistantIpc({
       return { success: false, error: error.message };
     }
   });
+
+  ipcMain.handle('practice-next-question', async (_event, payload = {}) => {
+    const actionId = 'practiceQuestion';
+    const onChunk = ({ text, index }) => {
+      sendToRenderer('ai-stream-chunk', { actionId, text, index });
+    };
+
+    try {
+      sendToRenderer('ai-stream-start', { actionId });
+      const result = await practiceService.generateQuestion({
+        ...(payload && typeof payload === 'object' ? payload : {}),
+        allowOfflineFallback: payload?.allowOfflineFallback !== false,
+        onChunk
+      });
+      sendToRenderer('ai-stream-end', { actionId });
+      return result;
+    } catch (error) {
+      console.error('Error generating practice question:', error);
+      sendToRenderer('ai-stream-end', { actionId });
+      return {
+        success: false,
+        error: mapGeminiErrorMessage(error, 'Failed to generate practice question')
+      };
+    }
+  });
+
+  ipcMain.handle('practice-evaluate-response', async (_event, payload = {}) => {
+    const actionId = 'practiceEvaluate';
+    const onChunk = ({ text, index }) => {
+      sendToRenderer('ai-stream-chunk', { actionId, text, index });
+    };
+
+    try {
+      sendToRenderer('ai-stream-start', { actionId });
+      const result = await practiceService.evaluateResponse({
+        ...(payload && typeof payload === 'object' ? payload : {}),
+        allowOfflineFallback: payload?.allowOfflineFallback !== false,
+        onChunk
+      });
+      sendToRenderer('ai-stream-end', { actionId });
+      return result;
+    } catch (error) {
+      console.error('Error evaluating practice response:', error);
+      sendToRenderer('ai-stream-end', { actionId });
+      return {
+        success: false,
+        error: mapGeminiErrorMessage(error, 'Failed to evaluate practice response')
+      };
+    }
+  });
+
+  ipcMain.handle('practice-get-state', async () => ({
+    success: true,
+    state: practiceService.getState()
+  }));
+
+  ipcMain.handle('practice-reset-session', async () => practiceService.resetSession());
 }
 
 module.exports = {

@@ -56,6 +56,7 @@ const { createWindowController } = require('./features/window/window-controller'
 const { DEFAULT_WINDOW_OPACITY_LEVEL } = require('./features/window/window-constants');
 const { logStartupConfiguration } = require('./startup-logging');
 const { createMobileServer } = require('./features/mobile-server/server');
+const { createInterviewPracticeService } = require('../services/ai/interview-practice');
 const { revealExistingInstance } = require('./single-instance');
 const { detectPlatformCapabilities } = require('../platform/capabilities');
 const { buildPlatformDiagnosticsView } = require('../platform/platform-diagnostics');
@@ -106,10 +107,29 @@ async function startApplication() {
   // Mobile server reports its own status (listening, URLs, client count) to
   // the desktop renderer via the un-augmented sender — we don't want it
   // bouncing back to mobile clients.
+  const practiceService = createInterviewPracticeService({
+    getAdapter: () => (geminiRuntime.isAiReady() ? geminiRuntime.getService() : null),
+    executeWithAdapter: (fn) => geminiRuntime.executeWithKeyFailover(fn),
+    getContextTexts: () => {
+      const pinned = contextServices?.documentService?.getPinnedDocumentTexts?.();
+      if (pinned) {
+        return pinned;
+      }
+      return {
+        resume: appState?.resumeText || '',
+        jobDescription: appState?.jobDescriptionText || ''
+      };
+    },
+    getProgrammingLanguage: () => geminiRuntime.getActiveProgrammingLanguage() || 'Python'
+  });
+
   const mobileServer = createMobileServer({
     getGeminiRuntime:    () => geminiRuntime,
     getScreenshotManager: () => screenshotManager,
-    notifyDesktop:        baseSendToRenderer
+    notifyDesktop:        baseSendToRenderer,
+    getContextServices:   () => contextServices,
+    getAppState:          () => appState,
+    practiceService
   });
 
   // Augmented sender: events flow to both the Electron renderer and all
@@ -313,7 +333,8 @@ async function startApplication() {
     sendToRenderer,
     quitApplication,
     getAppState: () => appState,
-    getContextServices: () => contextServices
+    getContextServices: () => contextServices,
+    practiceService
   });
 
   registerSttIpc({

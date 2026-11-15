@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "glassline": {
+      "command": "node",
+      "args": [
+        "source/scripts/run-mcp-server.js"
+      ],
+      "env": {
+        "GLASSLINE_AGENT_PORT": "7823"
+      }
+    }
+  }
+}
